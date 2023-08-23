@@ -2,7 +2,9 @@ const db = require('./database');
 
 const init = async () => {
   await db.run('CREATE TABLE Users (id INTEGER PRIMARY KEY AUTOINCREMENT, name varchar(32));');
-  await db.run('CREATE TABLE Friends (id INTEGER PRIMARY KEY AUTOINCREMENT, userId int, friendId int);');
+  await db.run('CREATE TABLE Friends (id INTEGER PRIMARY KEY AUTOINCREMENT, userId int, friendId int, FOREIGN KEY (userId) REFERENCES Users(id), FOREIGN KEY (friendId) REFERENCES Users(id));');
+  await db.run('CREATE UNIQUE INDEX Friends_unq ON Friends(userId, friendId);');
+  await db.run('CREATE INDEX name_idx ON Users (name);');
   const users = [];
   const names = ['foo', 'bar', 'baz'];
   for (i = 0; i < 27000; ++i) {
@@ -32,11 +34,13 @@ const init = async () => {
     });
   }
   console.log("Init Users Table...");
+  db.run(`PRAGMA ignore_check_constraints = 0;`)
   await Promise.all(users.map((un) => db.run(`INSERT INTO Users (name) VALUES ('${un}');`)));
   console.log("Init Friends Table...");
-  // await Promise.all(friends.map((list, i) => {
-  //   return Promise.all(list.map((j) => db.run(`INSERT INTO Friends (userId, friendId) VALUES (${i + 1}, ${j + 1});`)));
-  // }));
+  await Promise.all(friends.map((list, i) => {
+    return Promise.all(list.map((j) => db.run(`INSERT INTO Friends (userId, friendId) VALUES (${i + 1}, ${j + 1});`)));
+  }));
+  db.run(`PRAGMA ignore_check_constraints = 1;`)
   console.log("Ready.");
 }
 module.exports.init = init;
@@ -45,16 +49,16 @@ const search = async (req, res) => {
   const query = req.params.query;
   const userId = parseInt(req.params.userId);
 
-  db.all(`SELECT id, name, 
+  db.all(`SELECT u.id, u.name, 
   case 
-    when id IN (${userId}) then -1 
-    when id IN (SELECT f1.friendId from Friends f1 where f1.userId = ${userId}) then 1 
-    when id IN (SELECT f2.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId where f1.userId = ${userId}) then 2 
-    when id IN (SELECT f3.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId inner join Friends f3 on f3.userId = f2.friendId where f1.userId = ${userId}) then 3
-    when id IN (SELECT f4.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId inner join Friends f3 on f3.userId = f2.friendId inner join Friends f4 on f4.userId = f3.friendId where f1.userId = ${userId}) then 4 
+    when u.id IN (${userId}) then -1 
+    when u.id IN (SELECT f1.friendId from Friends f1 where u.id = f1.friendId and f1.userId = ${userId} limit 1) then 1 
+    when u.id IN (SELECT f2.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId where u.id = f2.friendId and f1.userId = ${userId} limit 1) then 2 
+    when u.id IN (SELECT f3.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId inner join Friends f3 on f3.userId = f2.friendId where u.id = f3.friendId and f1.userId = ${userId} limit 1) then 3
+    when u.id IN (SELECT f4.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId inner join Friends f3 on f3.userId = f2.friendId inner join Friends f4 on f4.userId = f3.friendId where u.id = f4.friendId and f1.userId = ${userId} limit 1) then 4 
     ELSE 0
   end as connection
-  from Users where name LIKE '${query}%'`).then((results) => {
+  from Users u where name LIKE '${query}%' LIMIT 20;`).then((results) => {
     res.statusCode = 200;
     res.json({
       success: true,
