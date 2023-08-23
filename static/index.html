@@ -70,6 +70,8 @@
 function ConnectionText(connection) {
   if (!connection) {
     return '&nbsp';
+  } else if (connection === -1) {
+    return 'mine';
   } else if (connection < 4) {
     return ['1st', '2nd', '3rd'][connection - 1];
   } else {
@@ -84,17 +86,19 @@ function RenderUser(container, user) {
   const con = ConnectionText(user.connection);
 
   div.innerHTML = `<div class='${cls}'>${con}</div><div class='userName'>${user.name}</div>`;
-  const button = document.createElement('div');
-  button.innerHTML = (user.connection === 1) ? 'Remove' : 'Add';
-  button.classList.add('button');
-  button.addEventListener('click', () => {
-    const cmd = (user.connection === 1) ? 'unfriend' : 'friend';
-    const userId = document.getElementById('user').value;
-    axios.get(`http://localhost:3001/api/${cmd}/${userId}/${user.id}`).then((response) => {
-      Search();
+  if((user.connection != -1)){
+    const button = document.createElement('div');
+    button.innerHTML = (user.connection === 1) ? 'Remove' : 'Add';
+    button.classList.add('button');
+    button.addEventListener('click', () => {
+      const cmd = (user.connection === 1) ? 'unfriend' : 'friend';
+      const userId = document.getElementById('user').value;
+      axios.get(`http://localhost:3001/api/${cmd}/${userId}/${user.id}`).then((response) => {
+        Search();
+      });
     });
-  });
-  div.appendChild(button);
+    div.appendChild(button);
+  }
   container.appendChild(div);
 }
 
