@@ -2,8 +2,7 @@ const db = require('./database');
 
 const init = async () => {
   await db.run('CREATE TABLE Users (id INTEGER PRIMARY KEY AUTOINCREMENT, name varchar(32));');
-  await db.run('CREATE TABLE Friends (id INTEGER PRIMARY KEY AUTOINCREMENT, userId int, friendId int, FOREIGN KEY (userId) REFERENCES Users(id), FOREIGN KEY (friendId) REFERENCES Users(id));');
-  await db.run('CREATE UNIQUE INDEX Friends_unq ON Friends(userId, friendId);');
+  await db.run('CREATE TABLE Friends (id INTEGER PRIMARY KEY AUTOINCREMENT, userId int, friendId int);');
   await db.run('CREATE INDEX name_idx ON Users (name);');
   const users = [];
   const names = ['foo', 'bar', 'baz'];
@@ -34,19 +33,22 @@ const init = async () => {
     });
   }
   console.log("Init Users Table...");
-  db.run(`PRAGMA ignore_check_constraints = 0;`)
   await Promise.all(users.map((un) => db.run(`INSERT INTO Users (name) VALUES ('${un}');`)));
   console.log("Init Friends Table...");
   await Promise.all(friends.map((list, i) => {
     return Promise.all(list.map((j) => db.run(`INSERT INTO Friends (userId, friendId) VALUES (${i + 1}, ${j + 1});`)));
   }));
-  db.run(`PRAGMA ignore_check_constraints = 1;`)
+  console.log("Adding Index...");
+  await db.run('CREATE INDEX Friends_unq ON Friends(friendId);');
+  await db.run('CREATE UNIQUE INDEX UserFriends_unq ON Friends(userId, friendId);');
   console.log("Ready.");
 }
 module.exports.init = init;
 
 const search = async (req, res) => {
   const query = req.params.query;
+  const limit = req.query.limit || 40;
+  const offset = req.query.offset || 0;
   const userId = parseInt(req.params.userId);
 
   db.all(`SELECT u.id, u.name, 
@@ -58,7 +60,7 @@ const search = async (req, res) => {
     when u.id IN (SELECT f4.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId inner join Friends f3 on f3.userId = f2.friendId inner join Friends f4 on f4.userId = f3.friendId where u.id = f4.friendId and f1.userId = ${userId} limit 1) then 4 
     ELSE 0
   end as connection
-  from Users u where name LIKE '${query}%' LIMIT 20;`).then((results) => {
+  from Users u where name LIKE '${query}%' LIMIT ${limit} OFFSET ${offset}`).then((results) => {
     res.statusCode = 200;
     res.json({
       success: true,
