@@ -54,6 +54,7 @@ const search = async (req, res) => {
   db.all(`SELECT u.id, u.name, 
   case 
     when u.id IN (${userId}) then -1 
+    when (SELECT f1.userId from Friends f1 where f1.userId = ${userId} limit 1) IS null then 0
     when u.id IN (SELECT f1.friendId from Friends f1 where u.id = f1.friendId and f1.userId = ${userId} limit 1) then 1 
     when u.id IN (SELECT f2.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId where u.id = f2.friendId and f1.userId = ${userId} limit 1) then 2 
     when u.id IN (SELECT f3.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId inner join Friends f3 on f3.userId = f2.friendId where u.id = f3.friendId and f1.userId = ${userId} limit 1) then 3
