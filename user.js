@@ -47,21 +47,37 @@ module.exports.init = init;
 
 const search = async (req, res) => {
   const query = req.params.query;
-  const limit = req.query.limit || 40;
-  const offset = req.query.offset || 0;
+  const limit = req.query.pagesize || 40;
+  const connection = req.query.maxconnection || 5;
   const userId = parseInt(req.params.userId);
 
-  db.all(`SELECT u.id, u.name, 
+  let sqlquery = `SELECT u.id, u.name, 
   case 
     when u.id IN (${userId}) then -1 
-    when (SELECT f1.userId from Friends f1 where f1.userId = ${userId} limit 1) IS null then 0
-    when u.id IN (SELECT f1.friendId from Friends f1 where u.id = f1.friendId and f1.userId = ${userId} limit 1) then 1 
-    when u.id IN (SELECT f2.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId where u.id = f2.friendId and f1.userId = ${userId} limit 1) then 2 
-    when u.id IN (SELECT f3.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId inner join Friends f3 on f3.userId = f2.friendId where u.id = f3.friendId and f1.userId = ${userId} limit 1) then 3
-    when u.id IN (SELECT f4.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId inner join Friends f3 on f3.userId = f2.friendId inner join Friends f4 on f4.userId = f3.friendId where u.id = f4.friendId and f1.userId = ${userId} limit 1) then 4 
-    ELSE 0
+    when (SELECT f1.userId from Friends f1 where f1.userId = ${userId} limit 1) IS null then 0 
+    `;
+    for(let i = 0; i<connection ; i++){
+      let selectquery = `SELECT f${i+1}.friendId from Friends f1 `;
+      for(let j = 1; j<=i ; j++){
+        selectquery += `inner join Friends f${j+1} on f${j+1}.userId = f${j}.friendId `;
+      }
+      selectquery = `${selectquery} where u.id = f${i+1}.friendId and f1.userId = ${userId} limit 1 `;
+      sqlquery += `when u.id IN (${selectquery}) then ${i+1} 
+      `;
+      
+    }
+    // when u.id IN (SELECT f1.friendId from Friends f1 where u.id = f1.friendId and f1.userId = ${userId} limit 1) then 1 
+    // when u.id IN (SELECT f2.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId where u.id = f2.friendId and f1.userId = ${userId} limit 1) then 2 
+    // when u.id IN (SELECT f3.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId inner join Friends f3 on f3.userId = f2.friendId where u.id = f3.friendId and f1.userId = ${userId} limit 1) then 3
+    // when u.id IN (SELECT f4.friendId from Friends f1 inner join Friends f2 on f2.userId = f1.friendId inner join Friends f3 on f3.userId = f2.friendId inner join Friends f4 on f4.userId = f3.friendId where u.id = f4.friendId and f1.userId = ${userId} limit 1) then 4 
+  sqlquery += ` ELSE 0
   end as connection
-  from Users u where name LIKE '${query}%' LIMIT ${limit} OFFSET ${offset}`).then((results) => {
+  from Users u where name LIKE '${query}%'`;
+  if(limit > 0){
+    sqlquery += ` LIMIT ${limit}`
+  }
+    console.log(sqlquery)
+  db.all(sqlquery).then((results) => {
     res.statusCode = 200;
     res.json({
       success: true,

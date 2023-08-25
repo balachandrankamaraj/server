@@ -123,8 +123,10 @@ function Render(data) {
 function Search() {
   const userId = document.getElementById('user').value;
   const search = document.getElementById('search').value;
+  const maxconnection = document.getElementById('maxconnection').value;
+  const pagesize = document.getElementById('pagesize').value;
 
-  axios.get(`http://localhost:3001/api/search/${userId}/${search}`).then((response) => {
+  axios.get(`http://localhost:3001/api/search/${userId}/${search}?maxconnection=${maxconnection}&pagesize=${pagesize}`).then((response) => {
     Render(response.data);
   }).catch((err) => {
     const div = document.getElementById('results');
@@ -137,6 +139,8 @@ function Search() {
 
 <body>
 <div class='search'>
+<div>Page size:</div><div><input id='pagesize' value='-1'/></div>
+<div>Max Connection:</div><div><input id='maxconnection' value='5'/></div>
 <div>User Id:</div><div><input id='user' value='1337'/></div>
 <div>Search:</div><div><input id='search' onchange='Search()' onkeyup='Search()'/></div>
 </div>
